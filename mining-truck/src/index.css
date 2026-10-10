@@ -1,0 +1,182 @@
+:root {
+  --bg: #f3efe8;
+  --header: #2b2a28;
+  --sidebar: #3a3835;
+  --accent: #e0a526;
+  --text: #2b2a28;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  background: var(--header);
+  color: white;
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  border-bottom: 3px solid var(--accent);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  min-height: 0; /* lets children shrink instead of overflowing */
+}
+
+.sidebar {
+  width: 180px;
+  background: var(--sidebar);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-left: 4px solid transparent;
+  color: #d8d4cc;
+  text-align: left;
+  padding: 12px 20px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.tab.active {
+  color: white;
+  border-left-color: var(--accent);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.content {
+  flex: 1;
+  padding: 20px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The rectangle the 3D scene lives in */
+.scene-box {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #c9c2b4;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.scene-box[hidden] {
+  display: none;
+}
+
+/* Wrapper for the scene and the controls under it */
+.site {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.site[hidden] {
+  display: none;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.controls select {
+  padding: 8px 10px;
+  font-size: 1rem;
+}
+
+.go {
+  background: var(--accent);
+  color: var(--header);
+  border: none;
+  border-radius: 4px;
+  padding: 9px 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.go:hover {
+  filter: brightness(1.08);
+}
+
+.go:focus-visible {
+  outline: 2px solid var(--header);
+  outline-offset: 2px;
+}
+
+
+.prompt-form {
+  display: flex;
+  gap: 12px;
+}
+
+.prompt-form input {
+  flex: 1;
+  padding: 9px 12px;
+  font-size: 1rem;
+  border: 1px solid #c9c2b4;
+  border-radius: 4px;
+}
+
+.prompt-form input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.reply {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.go:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.load {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
