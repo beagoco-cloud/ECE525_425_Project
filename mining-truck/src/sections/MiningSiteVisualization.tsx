@@ -1,0 +1,350 @@
+import { useRef, useState, type FormEvent } from 'react'
+import Scene from '../Scene'
+import type { Target, Job } from '../Truck'
+import { LANDMARKS } from '../landmarks'
+import { interpret, type Command } from '../interpret'
+import { CAPACITY, makeRocks, scatter, type Rock } from '../rocks'
+import { planTrips } from '../trips'
+
+// Sub-tabs inside the Mining Site Visualization section
+const SUBTABS = ['Site', 'Command log', 'Help'] as const
+type SubTab = (typeof SUBTABS)[number]
+
+function labelOf(id: string) {
+  return LANDMARKS.find((l) => l.id === id)?.label ?? id
+}
+
+// Plain-English version of a command, for the log
+function describe(cmd: Command): string {
+  switch (cmd.action) {
+    case 'moveTo':
+      return `drive to ${labelOf(cmd.target)}`
+    case 'pickUp':
+      return cmd.count ? `pick up ${cmd.count}` : 'pick up'
+    case 'dropOff':
+      return 'drop off'
+    case 'moveRocks':
+      return `move ${cmd.count ?? 'all'} rocks from ${labelOf(cmd.from)} to ${labelOf(cmd.to)}`
+  }
+}
+
+export default function MiningSiteVisualization() {
+  const [tab, setTab] = useState<SubTab>('Site')
+  const [target, setTarget] = useState<Target | null>(null)
+  const [selected, setSelected] = useState(LANDMARKS[0].id)
+  const [log, setLog] = useState<string[]>([])
+  const [prompt, setPrompt] = useState('')
+  const [reply, setReply] = useState('') // what the AI said about your request
+  const [status, setStatus] = useState('') // what just happened in the simulation
+  const [busy, setBusy] = useState(false) // true while waiting for the AI
+  const [rocks, setRocksState] = useState<Rock[]>(() => makeRocks('rockPile', 10))
+  const [job, setJob] = useState<Job | null>(null) // loading/unloading in progress
+
+  // Refs hold the "live" values so a list of commands can run one after another
+  // without waiting for React to re-render between steps.
+  const rocksRef = useRef<Rock[]>(rocks)
+  const placeRef = useRef<string | null>(null) // landmark the truck is parked at
+  const destRef = useRef<string | null>(null) // landmark it is driving to
+  const queueRef = useRef<Command[]>([]) // steps waiting for the truck to arrive
+  const jobIdRef = useRef(0)
+  // What to do at the moment the truck's animation says the rocks change hands
+  const pendingRef = useRef<((rear: [number, number, number]) => void) | null>(null)
+
+  function setRocks(next: Rock[]) {
+    rocksRef.current = next
+    setRocksState(next)
+  }
+
+  function note(msg: string) {
+    setStatus(msg)
+    setLog((prev) => [...prev, msg])
+  }
+
+  // Starts a loading/unloading animation. The rocks actually change hands partway
+  // through (handleJobPeak), and the next step waits until the animation is done.
+  function startJob(
+    kind: Job['kind'],
+    here: string,
+    apply: (rear: [number, number, number]) => void,
+    rest: Command[]
+  ): boolean {
+    const place = LANDMARKS.find((l) => l.id === here)
+    if (!place) return false
+    pendingRef.current = apply
+    queueRef.current = rest
+    jobIdRef.current += 1
+    setJob({ id: jobIdRef.current, kind, site: { x: place.x, z: place.z } })
+    return true
+  }
+
+  // Returns true if a job started, false if it couldn't be done
+  function startPickUp(count: number | undefined, rest: Command[]): boolean {
+    const here = placeRef.current
+    if (!here) {
+      note("Can't pick up rocks: the truck isn't parked at a location.")
+      return false
+    }
+    const current = rocksRef.current
+    const onTruck = current.filter((r) => r.place === null).length
+    const available = current.filter((r) => r.place === here)
+    const n = Math.min(count ?? CAPACITY, available.length, CAPACITY - onTruck)
+
+    if (n <= 0) {
+      note(onTruck >= CAPACITY ? 'The truck is full.' : `There are no rocks at ${labelOf(here)}.`)
+      return false
+    }
+    const taking = new Set(available.slice(0, n).map((r) => r.id))
+    return startJob(
+      'load',
+      here,
+      () => {
+        const now = performance.now()
+        setRocks(
+          rocksRef.current.map((r) =>
+            taking.has(r.id) ? { ...r, place: null, from: undefined, t0: now } : r
+          )
+        )
+        note(`Picked up ${n} rock${n === 1 ? '' : 's'} at ${labelOf(here)}.`)
+      },
+      rest
+    )
+  }
+
+  function startDropOff(rest: Command[]): boolean {
+    const here = placeRef.current
+    if (!here) {
+      note("Can't drop off rocks: the truck isn't parked at a location.")
+      return false
+    }
+    if (rocksRef.current.every((r) => r.place !== null)) {
+      note('The truck has no rocks to drop off.')
+      return false
+    }
+    return startJob(
+      'dump',
+      here,
+      (rear) => {
+        const now = performance.now()
+        let i = 0
+        const count = rocksRef.current.filter((r) => r.place === null).length
+        setRocks(
+          rocksRef.current.map((r) =>
+            // Each rock starts falling from the bed's rear lip, a moment after the last
+            r.place === null
+              ? { ...r, place: here, ...scatter(), from: rear, t0: now + 120 * i++ }
+              : r
+          )
+        )
+        note(`Dropped off ${count} rock${count === 1 ? '' : 's'} at ${labelOf(here)}.`)
+      },
+      rest
+    )
+  }
+
+  // Runs commands in order. Rock actions happen instantly; a moveTo pauses the
+  // rest of the list until the truck arrives. Returns true if a drive started.
+  function runCommands(cmds: Command[]): boolean {
+    for (let i = 0; i < cmds.length; i++) {
+      const cmd = cmds[i]
+      if (cmd.action === 'moveTo') {
+        const place = LANDMARKS.find((l) => l.id === cmd.target)
+        if (!place) continue
+        placeRef.current = null // on the road now
+        destRef.current = place.id
+        queueRef.current = cmds.slice(i + 1) // everything after this waits
+        setTarget({ x: place.x, z: place.z })
+        setLog((prev) => [...prev, `Go to ${place.label}`])
+        return true
+      }
+      if (cmd.action === 'moveRocks') {
+        if (cmd.from === cmd.to) {
+          note('The rocks are already there.')
+          continue
+        }
+        // Work out how many round trips are needed, using the real rock counts
+        const plan = planTrips(cmd.from, cmd.to, cmd.count, rocksRef.current)
+        if (plan.length === 0) {
+          const where = LANDMARKS.filter((l) =>
+            rocksRef.current.some((r) => r.place === l.id)
+          ).map((l) => l.label)
+          note(
+            `There are no rocks at ${labelOf(cmd.from)}.` +
+              (where.length > 0 ? ` Rocks are at: ${where.join(', ')}.` : '')
+          )
+          continue
+        }
+        const trips = plan.length / 4
+        note(
+          `Moving rocks from ${labelOf(cmd.from)} to ${labelOf(cmd.to)}: ${trips} trip${trips === 1 ? '' : 's'}.`
+        )
+        return runCommands([...plan, ...cmds.slice(i + 1)])
+      }
+      const rest = cmds.slice(i + 1)
+      if (cmd.action === 'pickUp') {
+        if (startPickUp(cmd.count, rest)) return true
+      } else if (startDropOff(rest)) {
+        return true
+      }
+    }
+    queueRef.current = []
+    return false
+  }
+
+  // When the truck arrives, carry on with the waiting steps
+  function handleArrive() {
+    placeRef.current = destRef.current
+    const started = runCommands(queueRef.current)
+    if (!started) setTarget(null)
+  }
+
+  // The truck's animation reached the moment when the rocks change hands
+  function handleJobPeak(rear: [number, number, number]) {
+    pendingRef.current?.(rear)
+    pendingRef.current = null
+  }
+
+  // The animation is finished, so continue with the waiting steps
+  function handleJobDone() {
+    setJob(null)
+    const started = runCommands(queueRef.current)
+    if (!started) setTarget(null)
+  }
+
+  // A snapshot of where the rocks are, so the AI isn't guessing
+  function worldState() {
+    const rocksAt: Record<string, number> = {}
+    for (const l of LANDMARKS) {
+      rocksAt[l.id] = rocksRef.current.filter((r) => r.place === l.id).length
+    }
+    return { rocksAt, onTruck: rocksRef.current.filter((r) => r.place === null).length }
+  }
+
+  async function handlePrompt(e: FormEvent) {
+    e.preventDefault() // stop the browser from reloading the page
+    const text = prompt.trim()
+    if (!text || busy) return
+    if (job) {
+      setReply('The truck is busy loading or unloading. Try again in a moment.')
+      return
+    }
+
+    setBusy(true)
+    setLog((prev) => [...prev, `You said: "${text}"`])
+
+    try {
+      const { commands, reply } = await interpret(text, CAPACITY, worldState())
+      setReply(
+        reply || (commands.length > 0 ? 'On it.' : "I couldn't turn that into a command.")
+      )
+      setStatus('')
+      if (commands.length > 0) {
+        // Show what the AI decided, which makes mistakes easy to spot
+        setLog((prev) => [...prev, `AI plan: ${commands.map(describe).join(', then ')}`])
+        runCommands(commands)
+      }
+      setPrompt('')
+    } catch {
+      setReply(
+        "I couldn't reach the AI. Check that the server is running and your API key is set."
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onTruck = rocks.filter((r) => r.place === null).length
+
+  return (
+    <>
+      <div className="subtabs" role="tablist" aria-label="Mining Site Visualization">
+        {SUBTABS.map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={t === tab}
+            className={t === tab ? 'subtab active' : 'subtab'}
+            onClick={() => setTab(t)}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <div className="site" hidden={tab !== 'Site'}>
+        <div className="scene-box">
+          <Scene
+            target={target}
+            rocks={rocks}
+            job={job}
+            onArrive={handleArrive}
+            onJobPeak={handleJobPeak}
+            onJobDone={handleJobDone}
+          />
+        </div>
+
+        <form className="prompt-form" onSubmit={handlePrompt}>
+          <input
+            type="text"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder='Tell the truck what to do, e.g. "move 3 rocks from the rock pile to the crusher"'
+            aria-label="Instruction for the truck"
+          />
+          <button type="submit" className="go" disabled={busy}>
+            {busy ? 'Thinking…' : 'Send'}
+          </button>
+        </form>
+        {reply && <p className="reply">{reply}</p>}
+        {status && <p className="reply">{status}</p>}
+
+        <div className="controls">
+          <label htmlFor="destination">Manual control</label>
+          <select
+            id="destination"
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            {LANDMARKS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <button
+            className="go"
+            disabled={job !== null}
+            onClick={() => {
+              queueRef.current = [] // cancel anything the AI had lined up
+              runCommands([{ action: 'moveTo', target: selected }])
+            }}
+          >
+            Go to
+          </button>
+          <span className="load">
+            Truck load: {onTruck} / {CAPACITY}
+          </span>
+        </div>
+      </div>
+
+      {tab === 'Command log' && (
+        <div>
+          {log.length === 0 ? (
+            <p>No commands yet.</p>
+          ) : (
+            <ol>
+              {log.map((entry, i) => (
+                <li key={i}>{entry}</li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+      {tab === 'Help' && (
+        <p>
+          Type an instruction like "move 3 rocks from the rock pile to the crusher" and
+          press Send, or use the manual dropdown. The truck holds up to {CAPACITY} rocks.
+        </p>
+      )}
+    </>
+  )
+}
