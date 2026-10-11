@@ -10,6 +10,8 @@ export type Rock = {
   dz: number
   rot: number
   size: number
+  from?: [number, number, number] // where a dropped rock starts falling from (the truck bed)
+  t0?: number // when its load/drop animation starts (milliseconds)
 }
 
 // A random spot (and spin) within a landmark's disc
