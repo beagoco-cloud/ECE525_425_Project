@@ -29,13 +29,14 @@ export default function ComputerVision() {
     <div>
       <h2>Computer Vision</h2>
       <p>
-        A computer vision model looks at a picture and finds objects in it. Here the truck
-        takes a photo each time it arrives at a location, then counts the rocks it can see.
+        Computer vision is the area of AI that teaches computers to understand images. 
+        One common task, object detection, finds objects in a picture and counts them. 
+        Here, the truck takes a photo each time it arrives at a location and counts the rocks it can see.
       </p>
 
       <h3>Try it</h3>
       <p>
-        Go to the Mining Site Visualization section and type these commands, in order:
+        Go to the Mining Site Visualization section and type these commands in order, one by one. Come back to this tab to see the pictures taken at the rock pile:
       </p>
       <ol>
         {SCENARIOS.map((s) => (

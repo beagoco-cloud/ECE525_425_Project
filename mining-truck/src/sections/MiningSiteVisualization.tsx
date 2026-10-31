@@ -5,7 +5,7 @@ import { LANDMARKS } from '../landmarks'
 import { interpret, type Command } from '../interpret'
 import { CAPACITY, makeRocks, scatter, type Rock } from '../rocks'
 import { planTrips } from '../trips'
-import { findScenario } from '../scenarios'
+import { findScenario, PILE } from '../scenarios'
 import { takePhoto, setSnapshot } from '../visionStore'
 
 // Sub-tabs inside the Mining Site Visualization section
@@ -198,12 +198,14 @@ export default function MiningSiteVisualization({
 
   function snapshotHere() {
     const place = destRef.current
+    if (place !== PILE) return // only photograph the rock pile
     const imageDataUrl = takePhoto()
-    if (!place || !imageDataUrl) return
+    if (!imageDataUrl) return
     const rockCount = rocksRef.current.filter((r) => r.place === place).length
     setSnapshot({ imageDataUrl, place, rockCount, time: Date.now() })
     note(`Camera: ${rockCount} rock${rockCount === 1 ? '' : 's'} at ${labelOf(place)}.`)
-}
+  }
+  
   // When the truck arrives, carry on with the waiting steps
   function handleArrive() {
     placeRef.current = destRef.current

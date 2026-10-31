@@ -27,12 +27,25 @@ export default function TruckCamera() {
       camera.lookAt(truck.localToWorld(LOOK_AT.clone()))
       camera.updateMatrixWorld()
 
+      // Hide floating text labels (like "Rock Pile") so they stay out of the photo
+      const hidden: THREE.Object3D[] = []
+      scene.traverse((o) => {
+        if (o.visible && 'sync' in o && 'text' in o) {
+          o.visible = false
+          hidden.push(o)
+        }
+      })
+
       // Render offscreen, then hand rendering back to the normal view
-      gl.setRenderTarget(target)
-      gl.render(scene, camera)
       const pixels = new Uint8Array(SIZE * SIZE * 4)
-      gl.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, pixels)
-      gl.setRenderTarget(null)
+      try {
+        gl.setRenderTarget(target)
+        gl.render(scene, camera)
+        gl.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, pixels)
+      } finally {
+        gl.setRenderTarget(null)
+        hidden.forEach((o) => (o.visible = true))
+      }
 
       // Pixels come back upside down, so flip them while drawing
       const flipped = new Uint8ClampedArray(pixels.length)
