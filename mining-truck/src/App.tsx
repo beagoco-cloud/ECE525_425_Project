@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { Command } from './interpret'
 import MiningSiteVisualization from './sections/MiningSiteVisualization'
 import LLM from './sections/LLM'
 import ComputerVision from './sections/ComputerVision'
@@ -11,6 +12,7 @@ type Section = (typeof SECTIONS)[number]
 
 export default function App() {
   const [section, setSection] = useState<Section>('Mining Site Visualization')
+  const [tutorialRun, setTutorialRun] = useState<{ id: number; commands: Command[] } | null>(null)
 
   return (
     <div className="app">
@@ -18,7 +20,12 @@ export default function App() {
         <h1>Haul Control</h1>
       </header>
 
-      <Tutorial />
+      <Tutorial
+        onShowSite={() => setSection('Mining Site Visualization')}
+        onRun={(commands) =>
+          setTutorialRun((prev) => ({ id: (prev?.id ?? 0) + 1, commands }))
+        }
+      />
 
       <div className="body">
         <nav className="sidebar" aria-label="Sections">
@@ -36,7 +43,7 @@ export default function App() {
         <main className="content">
           {/* Kept mounted (just hidden) so the truck and rocks don't reset when you switch sections */}
           <div className="section" hidden={section !== 'Mining Site Visualization'}>
-            <MiningSiteVisualization />
+            <MiningSiteVisualization tutorialRun={tutorialRun} />
           </div>
 
           {section === 'LLM' && <LLM />}
