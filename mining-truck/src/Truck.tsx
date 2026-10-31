@@ -173,7 +173,7 @@ export default function Truck({
   })
 
   return (
-    <group ref={group} position={position} rotation={[0, rotationY, 0]}>
+    <group name="truck" ref={group} position={position} rotation={[0, rotationY, 0]}>
       {/* Chassis (the frame the other parts sit on) */}
       <mesh position={[0, 1.4, 0]} castShadow>
         <boxGeometry args={[2.4, 0.5, 6]} />

@@ -1,6 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Sky, Billboard, Text } from '@react-three/drei'
 import Truck from './Truck'
+import TruckCamera from "./TruckCamera"
 import type { Target, Job } from './Truck'
 import RockMesh from './RockMesh'
 import type { Rock } from './rocks'
@@ -89,6 +90,7 @@ export default function Scene({ target, rocks, job, onArrive, onJobPeak, onJobDo
         onJobPeak={onJobPeak}
         onJobDone={onJobDone}
       />
+      <TruckCamera />
       <OrbitControls maxPolarAngle={Math.PI / 2 - 0.05} />
     </Canvas>
   )

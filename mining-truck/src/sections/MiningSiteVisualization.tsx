@@ -5,6 +5,8 @@ import { LANDMARKS } from '../landmarks'
 import { interpret, type Command } from '../interpret'
 import { CAPACITY, makeRocks, scatter, type Rock } from '../rocks'
 import { planTrips } from '../trips'
+import { findScenario } from '../scenarios'
+import { takePhoto, setSnapshot } from '../visionStore'
 
 // Sub-tabs inside the Mining Site Visualization section
 const SUBTABS = ['Site', 'Command log', 'Help'] as const
@@ -194,9 +196,18 @@ export default function MiningSiteVisualization({
     return false
   }
 
+  function snapshotHere() {
+    const place = destRef.current
+    const imageDataUrl = takePhoto()
+    if (!place || !imageDataUrl) return
+    const rockCount = rocksRef.current.filter((r) => r.place === place).length
+    setSnapshot({ imageDataUrl, place, rockCount, time: Date.now() })
+    note(`Camera: ${rockCount} rock${rockCount === 1 ? '' : 's'} at ${labelOf(place)}.`)
+}
   // When the truck arrives, carry on with the waiting steps
   function handleArrive() {
     placeRef.current = destRef.current
+    snapshotHere()
     const started = runCommands(queueRef.current)
     if (!started) setTarget(null)
   }
@@ -229,6 +240,20 @@ export default function MiningSiteVisualization({
     if (!text || busy) return
     if (job) {
       setReply('The truck is busy loading or unloading. Try again in a moment.')
+      return
+    }
+
+    const scenario = findScenario(text)
+    if (scenario) {
+      setLog((prev) => [
+        ...prev,
+        `You said: "${text}"`,
+        `Tutorial plan: ${scenario.commands.map(describe).join(', then ')}`,
+      ])
+      setReply(scenario.reply)
+      setStatus('')
+      setPrompt('')
+      runCommands(scenario.commands)
       return
     }
 
