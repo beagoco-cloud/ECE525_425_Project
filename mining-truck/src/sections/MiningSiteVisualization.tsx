@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Scene from '../Scene'
 import type { Target, Job } from '../Truck'
 import { LANDMARKS } from '../landmarks'
@@ -28,7 +28,11 @@ function describe(cmd: Command): string {
   }
 }
 
-export default function MiningSiteVisualization() {
+export default function MiningSiteVisualization({
+  tutorialRun,
+}: {
+  tutorialRun?: { id: number; commands: Command[] } | null
+}) {
   const [tab, setTab] = useState<SubTab>('Site')
   const [target, setTarget] = useState<Target | null>(null)
   const [selected, setSelected] = useState(LANDMARKS[0].id)
@@ -252,6 +256,20 @@ export default function MiningSiteVisualization() {
     }
   }
 
+    // The tutorial can send the truck commands. They run exactly like the manual dropdown.
+  useEffect(() => {
+    if (!tutorialRun) return
+    setTab('Site')
+    if (job) {
+      setReply('The truck is busy loading or unloading. Try again in a moment.')
+      return
+    }
+    queueRef.current = []
+    setReply('')
+    setStatus('')
+    runCommands(tutorialRun.commands)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tutorialRun])
   const onTruck = rocks.filter((r) => r.place === null).length
 
   return (
