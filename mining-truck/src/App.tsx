@@ -3,6 +3,7 @@ import MiningSiteVisualization from './sections/MiningSiteVisualization'
 import LLM from './sections/LLM'
 import ComputerVision from './sections/ComputerVision'
 import VLA from './sections/VLA'
+import Tutorial from "./components/Tutorial";
 
 // Main sections, listed down the left side. Each one lives in its own file in src/sections/.
 const SECTIONS = ['Mining Site Visualization', 'LLM', 'Computer Vision', 'VLA'] as const
@@ -16,6 +17,8 @@ export default function App() {
       <header className="header">
         <h1>Haul Control</h1>
       </header>
+
+      <Tutorial />
 
       <div className="body">
         <nav className="sidebar" aria-label="Sections">
