@@ -1,86 +1,58 @@
-// Takes one offscreen photo of the scene on demand (nothing calls it yet)
+import { useEffect } from 'react'
+import { useThree } from '@react-three/fiber'
+import * as THREE from 'three'
+import { registerCapture } from './visionStore'
 
-import { forwardRef, useImperativeHandle, useRef } from "react";
-import { useThree } from "@react-three/fiber";
-import * as THREE from "three";
- 
-export type TruckCameraHandle = {
-  capture: () => string; // returns a data URL (the photo)
-};
- 
-type TruckCameraProps = {
-  // where to aim the camera
-  lookAt: { x: number; z: number };
-  // where the camera sits
-  position: { x: number; y: number; z: number };
-  resolution?: number; // square image size (ex: 640 for YOLO input)
-};
- 
-const TruckCamera = forwardRef<TruckCameraHandle, TruckCameraProps>(
-  ({ lookAt, position, resolution = 640 }, ref) => {
-    const { gl, scene } = useThree(); // access renderer + scene
- 
-    const cameraRef = useRef<THREE.PerspectiveCamera>(null);
-    const renderTargetRef = useRef<THREE.WebGLRenderTarget | null>(null);
- 
-    // render target, reuse one every capture
-    function getRenderTarget() {
-      if (!renderTargetRef.current) {
-        renderTargetRef.current = new THREE.WebGLRenderTarget(
-          resolution,
-          resolution,
-        );
+const SIZE = 640 // square photo
+// Where the camera sits and what it looks at, in the truck's own space (+Z is forward).
+// It sits above the front of the cab, looking down at the pile the truck parks in front of.
+const CAMERA_POS = new THREE.Vector3(0, 4.5, 3.2)
+const LOOK_AT = new THREE.Vector3(0, 0, 6)
+
+// Invisible. Takes one photo from the parked truck whenever takePhoto() is called.
+export default function TruckCamera() {
+  const { gl, scene } = useThree()
+
+  useEffect(() => {
+    const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 200)
+    const target = new THREE.WebGLRenderTarget(SIZE, SIZE)
+    target.texture.colorSpace = THREE.SRGBColorSpace // keeps colors the same as on screen
+
+    function capture(): string | null {
+      const truck = scene.getObjectByName('truck')
+      if (!truck) return null
+
+      truck.updateWorldMatrix(true, false)
+      camera.position.copy(truck.localToWorld(CAMERA_POS.clone()))
+      camera.lookAt(truck.localToWorld(LOOK_AT.clone()))
+      camera.updateMatrixWorld()
+
+      // Render offscreen, then hand rendering back to the normal view
+      gl.setRenderTarget(target)
+      gl.render(scene, camera)
+      const pixels = new Uint8Array(SIZE * SIZE * 4)
+      gl.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, pixels)
+      gl.setRenderTarget(null)
+
+      // Pixels come back upside down, so flip them while drawing
+      const flipped = new Uint8ClampedArray(pixels.length)
+      const row = SIZE * 4
+      for (let y = 0; y < SIZE; y++) {
+        flipped.set(pixels.subarray(y * row, (y + 1) * row), (SIZE - 1 - y) * row)
       }
-      return renderTargetRef.current;
+      const canvas = document.createElement('canvas')
+      canvas.width = SIZE
+      canvas.height = SIZE
+      canvas.getContext('2d')!.putImageData(new ImageData(flipped, SIZE, SIZE), 0, 0)
+      return canvas.toDataURL('image/png')
     }
- 
-    function capture(): string {
-      const camera = cameraRef.current;
-      if (!camera) return "";
- 
-      // make sure camera is pointed at correct position before shooting
-      camera.position.set(position.x, position.y, position.z);
-      camera.lookAt(lookAt.x, 0, lookAt.z);
-      camera.updateMatrixWorld();
- 
-      const target = getRenderTarget();
- 
-      // render offscreen
-      gl.setRenderTarget(target);
-      gl.render(scene, camera);
- 
-      // read pixels back out
-      const pixels = new Uint8Array(resolution * resolution * 4);
-      gl.readRenderTargetPixels(target, 0, 0, resolution, resolution, pixels);
- 
-      // restore normal rendering to the visible canvas
-      gl.setRenderTarget(null);
- 
-      // convert raw pixels into a usable image (data URL)
-      const canvas = document.createElement("canvas");
-      canvas.width = resolution;
-      canvas.height = resolution;
-      const ctx = canvas.getContext("2d")!;
-      const imageData = ctx.createImageData(resolution, resolution);
-      imageData.data.set(pixels);
-      ctx.putImageData(imageData, 0, 0);
- 
-      return canvas.toDataURL("image/png");
+
+    const unregister = registerCapture(capture)
+    return () => {
+      unregister()
+      target.dispose()
     }
- 
-    useImperativeHandle(ref, () => ({ capture }));
- 
-    // camera element itself
-    return (
-      <perspectiveCamera
-        ref={cameraRef}
-        fov={60}
-        near={0.1}
-        far={100}
-        position={[position.x, position.y, position.z]}
-      />
-    );
-  },
-);
- 
-export default TruckCamera;
+  }, [gl, scene])
+
+  return null
+}
