@@ -233,6 +233,7 @@ type Trace = {
   request: unknown
   raw: RawResponse | null
   example: boolean // true when a saved example reply was used instead of the AI server
+  ms: number | null // time from Send to the model's reply (live runs only)
 }
 
 export default function LLM() {
@@ -241,6 +242,7 @@ export default function LLM() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [trace, setTrace] = useState<Trace | null>(null)
+  const [times, setTimes] = useState<number[]>([]) // live response times this session, for G4 / Section 5
 
   // This page uses the site's starting layout: 10 rocks at the rock pile, truck empty.
   const rocks = useMemo(() => makeRocks('rockPile', 10), [])
@@ -263,20 +265,23 @@ export default function LLM() {
           return
         }
         const r = await traceInterpret(t, state, example.response)
-        setTrace({ text: t, ...r, raw: r.raw as RawResponse | null, example: true })
+        setTrace({ text: t, ...r, raw: r.raw as RawResponse | null, example: true, ms: null })
       } else {
         try {
+          const t0 = performance.now()
           const r = await traceInterpret(t, state)
-          setTrace({ text: t, ...r, raw: r.raw as RawResponse | null, example: false })
+          const ms = Math.round(performance.now() - t0)
+          setTimes((prev) => [...prev, ms])
+          setTrace({ text: t, ...r, raw: r.raw as RawResponse | null, example: false, ms })
         } catch {
           if (example) {
             // Server not reachable: show the saved example so the page still works
             const r = await traceInterpret(t, state, example.response)
-            setTrace({ text: t, ...r, raw: r.raw as RawResponse | null, example: true })
-            setError("Couldn't reach the AI server, so this shows a saved example reply.")
+            setTrace({ text: t, ...r, raw: r.raw as RawResponse | null, example: true, ms: null })
+            setError("Couldn't reach the AI server (Ollama), so this shows a saved example reply.")
           } else {
             setError(
-              "Couldn't reach the AI server. Check that it's running and your API key is set, or turn on example mode."
+              "Couldn't reach the AI server. Check that the server and Ollama are running, or turn on example mode."
             )
           }
         }
@@ -341,8 +346,20 @@ export default function LLM() {
         <div className="llm-model">
           <small>Model running in this tab</small>
           <span className="llm-mono">
-            {trace?.example ? 'Saved example reply (no server)' : 'Your AI server · /api/command'}
+            {trace?.example ? 'Saved example reply (no server)' : 'Local Ollama model · /api/command'}
           </span>
+        </div>
+        <div className="llm-model">
+          <small>Response time (live runs)</small>
+          {times.length === 0 ? (
+            <span className="llm-why">No live runs yet. Send a command with the server running.</span>
+          ) : (
+            <span className="llm-mono">
+              Last {times[times.length - 1].toLocaleString()} ms · avg{' '}
+              {Math.round(times.reduce((a, b) => a + b, 0) / times.length).toLocaleString()} ms · {times.length} run
+              {times.length === 1 ? '' : 's'}
+            </span>
+          )}
         </div>
       </div>
 
@@ -351,7 +368,7 @@ export default function LLM() {
         <div className="llm-panel-head">
           <h3>Command to truck actions</h3>
           <span className={trace && !trace.example ? 'llm-badge live' : 'llm-badge'}>
-            {!trace ? 'Ready' : trace.example ? 'Example reply' : 'Live AI'}
+            {!trace ? 'Ready' : trace.example ? 'Example reply' : `Live AI · ${trace.ms?.toLocaleString()} ms`}
           </span>
         </div>
 
@@ -369,7 +386,7 @@ export default function LLM() {
                 {busy ? 'Thinking…' : 'Send'}
               </button>
             </form>
-              <div className="llm-tries">
+            <div className="llm-tries">
           <span style={{ fontSize: '0.85rem', color: '#5f5a52' }}>Try:</span>
           {EXAMPLES.map((e) => (
             <button
@@ -394,7 +411,7 @@ export default function LLM() {
           {error && <p className={trace?.example ? 'llm-msg warn' : 'llm-msg err'}>{error}</p>}
 
           {!trace ? (
-            <p className="llm-empty">Press Send, or pick an example below, to see each step.</p>
+            <p className="llm-empty">Press Send, or pick an example above, to see each step.</p>
           ) : (
             <>
               <Block label={`Step 1 · text split into tokens (${tokens.length}, approximate)`}>
