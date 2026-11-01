@@ -33,11 +33,11 @@ const EXAMPLES: { text: string; response: RawResponse }[] = [
     },
   },
   {
-    text: 'drive to the volcano, then the quarry',
+    text: 'drive to the crusher, then the quarry',
     response: {
       reply: 'Heading to the quarry.',
       commands: [
-        { action: 'moveTo', target: 'volcano' },
+        { action: 'moveTo', target: 'crusher' },
         { action: 'moveTo', target: 'quarry' },
       ],
     },

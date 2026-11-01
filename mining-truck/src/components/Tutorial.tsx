@@ -2,6 +2,8 @@ import { useState, type CSSProperties } from "react";
 import { LANDMARKS } from "../landmarks";
 import type { Command } from "../interpret";
 
+const FEEDBACK_URL = "https://docs.google.com/forms/d/e/1FAIpQLSeTfPbY1JwFpwrPKsNIyaxUoiea7AR0CEA9S0reznEDmd_2UQ/viewform?usp=publish-editor";
+
 type InfoStep = {
   kind: "info";
   title: string;
@@ -31,10 +33,10 @@ type Step = InfoStep | QuizStep | TryStep;
 // same list of actions the AI would have produced, already written out.
 const SAMPLES: { text: string; plan: string; commands: Command[] }[] = [
   {
-    text: "drive to the volcano, then the quarry",
-    plan: "Drive to the volcano, then drive to the quarry.",
+    text: "drive to the crusher, then the quarry",
+    plan: "Drive to the crusher, then drive to the quarry.",
     commands: [
-      { action: "moveTo", target: "volcano" },
+      { action: "moveTo", target: "crusher" },
       { action: "moveTo", target: "quarry" },
     ],
   },
@@ -66,43 +68,7 @@ const STEPS: Step[] = [
     body: [
       "Mining is dangerous, expensive, and repetitive. AI helps by taking on the jobs that put people at risk or that machines can do more consistently.",
       "Autonomous trucks can haul material around the clock without fatigue, and AI can help spot hazards and plan routes to save fuel and time.",
-      "First you'll drive the truck without any AI, so you can see why AI helps. Then you'll learn about three kinds of AI: LLMs, computer vision, and VLAs. Each one is followed by a short quiz.",
-    ],
-  },
-
-  // ---------- Manual control ----------
-  {
-    kind: "info",
-    title: "Driving Without AI",
-    body: [
-      "Before adding any AI, let's see what working without it looks like. Manual control is like driving by remote control with GPS: a person picks a destination, and the truck drives there.",
-      "The truck doesn't understand what you're trying to accomplish. It only follows one order at a time, and it can't plan ahead. You have to wait until it arrives before giving the next order.",
-    ],
-  },
-  {
-    kind: "try",
-    title: "Try Manual Control",
-    mode: "manual",
-    body: [
-      "Pick a destination and press Go to. This box will move out of the way so you can watch the truck drive.",
-    ],
-  },
-
-  // ---------- Why an LLM ----------
-  {
-    kind: "info",
-    title: "Why Would You Want an LLM?",
-    body: [
-      "Imagine you want the truck to visit the volcano and then the quarry. With manual control, you send it to the volcano, wait for it to arrive, then send it to the quarry. Moving rocks takes even more steps: drive to the pile, load, drive to the destination, unload, and repeat.",
-      "A language model lets you say it all in one sentence, in plain English, and works out the steps for you.",
-    ],
-  },
-  {
-    kind: "try",
-    title: "Try Plain-English Commands",
-    mode: "samples",
-    body: [
-      "Pick a sample command and press Run. These are pre-programmed for the tutorial, so no AI is called and they start instantly. In the full app, an LLM would work out the steps from your sentence.",
+      "You'll start by learning about three kinds of AI: LLMs, computer vision, and VLAs, each followed by a short quiz. Then you'll drive the truck yourself, first without AI and then with plain-English commands, to see the difference.",
     ],
   },
 
@@ -182,6 +148,55 @@ const STEPS: Step[] = [
     correct: 2,
     explanation:
       "Correct! A VLA connects vision and language to actions a machine can perform.",
+  },
+
+  // ---------- Manual control ----------
+  {
+    kind: "info",
+    title: "Driving Without AI",
+    body: [
+      "Now let's put the truck to work. First, here's what working without AI looks like. Manual control is like driving by remote control with GPS: a person picks a destination, and the truck drives there.",
+      "The truck doesn't understand what you're trying to accomplish. It only follows one order at a time, and it can't plan ahead. You have to wait until it arrives before giving the next order.",
+    ],
+  },
+  {
+    kind: "try",
+    title: "Try Manual Control",
+    mode: "manual",
+    body: [
+      "Pick a destination and press Go to. This box will move out of the way so you can watch the truck drive.",
+    ],
+  },
+
+  // ---------- Why an LLM ----------
+  {
+    kind: "info",
+    title: "Why Would You Want an LLM?",
+    body: [
+      "Imagine you want the truck to visit the quarry and then camp. With manual control, you send it to the quarry, wait for it to arrive, then send it to camp. Moving rocks takes even more steps: drive to the pile, load, drive to the destination, unload, and repeat.",
+      "A language model lets you say it all in one sentence, in plain English, and works out the steps for you.",
+    ],
+  },
+  {
+    kind: "try",
+    title: "Try Plain-English Commands",
+    mode: "samples",
+    body: [
+      "Pick a sample command and press Run. These are pre-programmed for the tutorial, so no AI is called and they start instantly. In the full app, an LLM would work out the steps from your sentence.",
+    ],
+  },
+
+    // ---------- Explore the rest of the site ----------
+  {
+    kind: "info",
+    title: "Keep Exploring!",
+    body: [
+      "You've seen how AI can help run a mine, and there's a lot more to learn on the rest of the site. Try out the other tabs on the left.",
+      "Computer Vision shows an image of what the truck sees when it visits the rock pile.",
+      "LLM traces how a language model interprets a command, breaking it down step by step into an action plan for the truck.",
+      "VLA shows how LLMs and computer vision come together to turn input into action.",
+      "Click Finish to close the tutorial and start exploring.",
+    ],
   },
 ];
 
@@ -266,22 +281,47 @@ export default function Tutorial({ onShowSite, onRun }: Props) {
 
   return (
     <>
-      {mode === "closed" && (
-        <button
-          onClick={openTutorial}
-          style={{
+    {mode === "closed" && (
+    <div
+        style={{
+        position: "fixed",
+        top: 10,
+        right: 16,
+        zIndex: 1000,
+        display: "flex",
+        gap: 8,
+        }}
+    >
+        <a
+        href={FEEDBACK_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
             ...buttonBase,
-            position: "fixed",
-            top: 16,
-            right: 16,
-            zIndex: 1000,
+            padding: "6px 14px",
+            fontSize: 15,
+            background: "#e5e7eb",
+            color: "#1f2937",
+            textDecoration: "none",
+            display: "inline-block",
+        }}
+        >
+        Give feedback
+        </a>
+        <button
+        onClick={openTutorial}
+        style={{
+            ...buttonBase,
+            padding: "6px 14px",
+            fontSize: 15,
             background: "#f59e0b",
             color: "#1f2937",
-          }}
+        }}
         >
-          Play tutorial
+        Play tutorial
         </button>
-      )}
+    </div>
+    )}
 
       {/* Small bar shown while the user watches the truck */}
       {mode === "minimized" && (
