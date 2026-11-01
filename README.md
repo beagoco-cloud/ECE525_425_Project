@@ -28,14 +28,16 @@ There is also a **Play tutorial** button (top right) that walks you through LLMs
 
 1. **Download the project.** In GitHub Desktop, choose File → Clone repository and pick this repo, or run:
    ```
-   git clone <https://github.com/beagoco-cloud/ECE525_425_Project.git>
+   git clone https://github.com/beagoco-cloud/ECE525_425_Project.git
+   cd ECE525_425_Project/mining-truck
    ```
+   Run all the `npm` commands below from inside the `mining-truck` folder.
 2. **Open the project folder** (the one containing `package.json`, named `mining-truck`) in VS Code.
 3. **Open a terminal in VS Code** (Terminal → New Terminal) and install the project's dependencies:
    ```
    npm install
    ```
-   This can take a minute or two. You may see warnings about security audits or install scripts. They can be ignored.
+   Dependencies are listed in `package.json` (the JavaScript equivalent of `requirements.txt`). This can take a minute or two. You may see warnings about security audits or install scripts. They can be ignored.
 4. **Download the AI model** (about 5 GB, so it takes a few minutes):
    ```
    ollama pull llama3.1:8b
